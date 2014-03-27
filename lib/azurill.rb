@@ -38,6 +38,8 @@ module Azurill
       FFI::NCurses.initscr
       #FFI::NCurses.start_color
       FFI::NCurses.curs_set(0)
+      FFI::NCurses.nodelay(FFI::NCurses.stdscr, true)
+      FFI::NCurses.cbreak
       FFI::NCurses.raw
       FFI::NCurses.noecho
       FFI::NCurses.clear
@@ -76,9 +78,13 @@ module Azurill
       unless @queue.empty?
         @queue.shift.call
       else
-        # TODO: event handling
-        @controller.handle_char(FFI::NCurses.getch)
+        unless (c = FFI::NCurses.getch) == FFI::NCurses::ERR
+          @controller.handle_char(c)
+        else
+          sleep(0.1)
+        end
       end
+      @controller.draw
     end
 
     # Queue a block for the next available tick.

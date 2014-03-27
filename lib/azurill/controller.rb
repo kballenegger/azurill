@@ -1,20 +1,20 @@
 
+require 'azurill/view'
+
 module Azurill
   
   class Controller
 
     def initialize
-      # :)
+      h, w = FFI::NCurses.getmaxyx(FFI::NCurses.stdscr)
 
-      Application.current.queue do
-        FFI::NCurses.addstr("Hello world\n")
-      end
+      @main_view = View.new({x: 0, y: 1, w: w, h: h - 2})
 
-      Thread.new do
-        sleep(3)
-        Application.current.next do
-          Application.exit!
-        end
+      @main_view.draw do
+        # first a line at the top
+        str = rect[:w].times.map {|_| '-' }.join('')
+        FFI::NCurses.addstr(str)
+        FFI::NCurses.addstr("Hello world #{h}\n")
       end
 
     end
@@ -30,6 +30,10 @@ module Azurill
           FFI::NCurses.addstr("Hello!\n")
         end
       end
+    end
+
+    def draw
+      @main_view.draw
     end
 
     def close!
