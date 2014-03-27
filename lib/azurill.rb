@@ -36,7 +36,7 @@ module Azurill
     #
     def initialize
       FFI::NCurses.initscr
-      FFI::NCurses.start_color
+      #FFI::NCurses.start_color
       FFI::NCurses.curs_set(0)
       FFI::NCurses.raw
       FFI::NCurses.noecho
@@ -75,10 +75,10 @@ module Azurill
     #
     def tick
       unless @queue.empty?
-        @queue.pop.call
+        @queue.shift.call
       else
         # TODO: event handling
-        FFI::NCurses.getch
+        @controller.handle_char(FFI::NCurses.getch)
       end
     end
 
@@ -86,6 +86,9 @@ module Azurill
     #
     def queue(&b)
       @queue << b
+    end
+    def next(&b)
+      @queue.unshift(b)
     end
   end
 end
