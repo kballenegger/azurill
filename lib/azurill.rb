@@ -1,4 +1,5 @@
 require 'azurill/version'
+require 'azurill/controller'
 require 'ffi-ncurses'
 
 module Azurill
@@ -35,6 +36,11 @@ module Azurill
     #
     def initialize
       FFI::NCurses.initscr
+      FFI::NCurses.start_color
+      FFI::NCurses.curs_set(0)
+      FFI::NCurses.raw
+      FFI::NCurses.noecho
+      FFI::NCurses.keypad(FFI::NCurses.stdscr, true)
       FFI::NCurses.clear
     end
 
@@ -43,26 +49,32 @@ module Azurill
     #
     def run!
       @queue = []
-      @controller = Controller.new(self)
+      queue do
+        @controller = Controller.new
+      end
       catch :exit do
         while true
           tick
           FFI::NCurses.refresh
         end
       end
+    rescue
+      FFI::NCurses.clear
+      FFI::NCurses.endwin
+      raise
     end
 
     # This closes the app, and clears the app from the terminal.
     #
     def close!
-      @controller.close!
+      @controller.close! if @controller
       FFI::NCurses.endwin
     end
 
     # This method gets executed for every iteration of the run loop.
     #
     def tick
-      unless queue.empty?
+      unless @queue.empty?
         @queue.pop.call
       else
         # TODO: event handling

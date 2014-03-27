@@ -5,14 +5,16 @@ module Azurill
 
     def initialize
       # :)
-      FFI::NCurses.addstr('Hello world')
 
       Application.current.queue do
-        FFI::NCurses.getch
+        FFI::NCurses.addstr('Hello world')
       end
-      Application.current.queue do
-        FFI::NCurses.addstr('After an event... :)')
-      end
+      #Application.current.queue do
+        #FFI::NCurses.getch
+      #end
+      #Application.current.queue do
+        #FFI::NCurses.addstr('After an event... :)')
+      #end
     end
 
     def close!
