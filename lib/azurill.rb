@@ -40,7 +40,6 @@ module Azurill
       FFI::NCurses.curs_set(0)
       FFI::NCurses.raw
       FFI::NCurses.noecho
-      FFI::NCurses.keypad(FFI::NCurses.stdscr, true)
       FFI::NCurses.clear
     end
 
