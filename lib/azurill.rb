@@ -1,4 +1,4 @@
-require "azurill/version"
+require 'azurill/version'
 
 module Azurill
   # Your code goes here...
