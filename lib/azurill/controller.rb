@@ -11,27 +11,42 @@ module Azurill
 
       @main_view = View.new({x: 0, y: 1, w: w, h: h - 2})
 
-      @buffer = []
+      @logs = []
 
       controller = self
       @main_view.draw do
         # first a line at the top
         FFI::NCurses.clear
         FFI::NCurses.move(rect[:y], rect[:x])
-        str = rect[:w].times.map {|_| '-' }.join('')
+        str = rect[:w].times.map {|_| '*' }.join('')
+        FFI::NCurses.attr_set(FFI::NCurses::A_UNDERLINE, Colors.yellow_on_black, nil)
         FFI::NCurses.addstr(str)
+        Colors.reset!
         # TODO: move to subview
         i = 1
-        controller.instance_variable_get(:@buffer).each do |e|
-          lines = e.split("\n") # TODO: split on lines that are too long...
+        controller.instance_variable_get(:@logs).each do |e|
+          color = case e[:l]
+                  when :verbose; :nocolor
+                  when :info; :cyan_on_black
+                  when :warn; :yellow_on_black
+                  when :err; :red_on_black
+                  end
+          char = case e[:l]
+                 when :verbose; 'V'
+                 when :info; 'I'
+                 when :warn; 'W'
+                 when :err; 'E'
+                 end
+
+          lines = e[:m].split("\n") # TODO: split on lines that are too long...
           # draw label
           FFI::NCurses.move(rect[:y] + i, rect[:x])
-          Colors.with(:red_on_black) do
-            FFI::NCurses.addch('W'.ord)
+          Colors.with(color) do
+            FFI::NCurses.addch(char.ord)
           end
           lines.each_with_index do |l,j|
             FFI::NCurses.move(rect[:y] + i + j, rect[:x] + 2)
-            Colors.with(:black_on_red) do
+            Colors.with(color) do
               FFI::NCurses.addch('|'.ord)
             end
             FFI::NCurses.move(rect[:y] + i + j, rect[:x] + 4)
@@ -47,7 +62,7 @@ module Azurill
           @main_view.dirty!
           str = "Hello world random #{rand(50)}..."
           rand(5).times { str << "\nline!"}
-          @buffer << str
+          @logs << {m: str, l: [:warn, :info, :err, :verbose].sample}
         end
       end
 
@@ -62,10 +77,10 @@ module Azurill
         end
       when 'c'.ord
         @main_view.dirty!
-        @buffer = []
+        @logs = []
       else
         @main_view.dirty!
-        @buffer << "Hello!"
+        @logs << {m: 'Hello!', l: :verbose}
       end
     end
 

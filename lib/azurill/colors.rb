@@ -7,13 +7,13 @@ module Azurill
     class << self
 
       def init_colors
+        return if @colors
         @colors = []
 
         # define color pairs
         define_color(:RED, :BLACK)
-        define_color(:BLACK, :RED)
-        define_color(:RED, :RED)
-        define_color(:BLACK, :YELLOW)
+        define_color(:YELLOW, :BLACK)
+        define_color(:CYAN, :BLACK)
       end
 
 
@@ -24,6 +24,7 @@ module Azurill
       end
 
       def set!(c)
+        init_colors
         FFI::NCurses.attr_set(FFI::NCurses::A_NORMAL, self.send(c), nil)
       end
 
@@ -31,7 +32,12 @@ module Azurill
         FFI::NCurses.attr_set(FFI::NCurses::A_NORMAL, 0, nil)
       end
 
+      def nocolor
+        0
+      end
+
       def method_missing(symbol)
+        init_colors
         @colors.each_with_index do |c,i|
           #return FFI::NCurses.COLOR_PAIR(i) if c == symbol
           return i+1 if c == symbol
@@ -50,5 +56,3 @@ module Azurill
     end
   end
 end
-
-Azurill::Colors.init_colors
