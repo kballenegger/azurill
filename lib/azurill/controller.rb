@@ -79,6 +79,7 @@ module Azurill
     def draw_content
       rect = @main_view.rect
       i = 0
+      max_len = rect[:w] - 4
       @logs.each do |e|
         color = case e[:l]
                 when :verbose; :nocolor
@@ -93,7 +94,9 @@ module Azurill
                when :error; 'E'
                end
 
-        lines = e[:m].split("\n") # TODO: split on lines that are too long...
+        lines = e[:m].split("\n").map do |l|
+          l.scan(/.{1,#{max_len}}/)
+        end.flatten
         # draw label
         point = point_in_parent(rect[:y] + i - @offset, rect[:x])
         if in_rect(*point)
