@@ -1,6 +1,8 @@
+require 'ffi-ncurses'
+
+require 'azurill/log'
 require 'azurill/version'
 require 'azurill/controller'
-require 'ffi-ncurses'
 
 module Azurill
 
@@ -42,6 +44,7 @@ module Azurill
       FFI::NCurses.cbreak
       FFI::NCurses.raw
       FFI::NCurses.noecho
+      FFI::NCurses.start_color
       FFI::NCurses.clear
     end
 
