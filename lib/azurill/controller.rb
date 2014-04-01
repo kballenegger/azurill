@@ -56,7 +56,7 @@ module Azurill
 
     def draw_tab_bar(t)
       rect = @main_view.rect
-      FFI::NCurses.move(rect[:y], rect[:x])
+      FFI::NCurses.move(rect[:y]-1, rect[:x])
       top_bar = t
       top_bar << (rect[:w] - top_bar.length).times.map {|_| ' ' }.join('')
       FFI::NCurses.attr_set(FFI::NCurses::A_BOLD, Colors.black_on_magenta, nil)
@@ -78,7 +78,7 @@ module Azurill
 
     def draw_content
       rect = @main_view.rect
-      i = 1
+      i = 0
       @logs.each do |e|
         color = case e[:l]
                 when :verbose; :nocolor
@@ -95,33 +95,44 @@ module Azurill
 
         lines = e[:m].split("\n") # TODO: split on lines that are too long...
         # draw label
-        if in_rect(rect[:y] + i - @offset, rect[:x])
-          FFI::NCurses.move(rect[:y] + i - @offset, rect[:x])
+        point = point_in_parent(rect[:y] + i - @offset, rect[:x])
+        if in_rect(*point)
+          FFI::NCurses.move(*point)
           Colors.with(color) do
             FFI::NCurses.addch(char.ord)
           end
         end
         lines.each_with_index do |l,j|
-          next unless in_rect(rect[:y] + i + j - @offset, rect[:x] + 2)
-          FFI::NCurses.move(rect[:y] + i + j - @offset, rect[:x] + 2)
+          point = point_in_parent(rect[:y] + i + j - @offset, rect[:x] + 2)
+          next unless in_rect(*point)
+          FFI::NCurses.move(*point)
           Colors.with(color) do
             FFI::NCurses.addch('|'.ord)
           end
-          FFI::NCurses.move(rect[:y] + i + j - @offset, rect[:x] + 4)
+          FFI::NCurses.move(*point_in_parent(rect[:y] + i + j - @offset, rect[:x] + 4))
           FFI::NCurses.addstr(l)
         end
         i += lines.count + 1
       end
     end
 
+    # y, x
+    def point_in_parent(y,x)
+      [
+        y + @main_view.rect[:y],
+        x + @main_view.rect[:x]
+      ]
+    end
+
+    # y, x
     def in_rect(y,x)
       w, h = @main_view.rect[:w], @main_view.rect[:h]
       ox, oy = @main_view.rect[:x], @main_view.rect[:y]
-      x <= w + ox && x > ox && y <= h + oy && y > oy
+      x < w + ox && x >= ox && y < h + oy && y >= oy
     end
 
     def size(w,h)
-      @main_view.rect = {x: 0, y: 0, w: w, h: h - 2}
+      @main_view.rect = {x: 0, y: 1, w: w, h: h - 2}
     end
 
     def handle_char(c)
