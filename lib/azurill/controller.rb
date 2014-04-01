@@ -18,6 +18,8 @@ module Azurill
 
       @logs = []
 
+      @offset = 0
+
       controller = self
       @main_view.draw do
         # first a line at the top
@@ -93,20 +95,29 @@ module Azurill
 
         lines = e[:m].split("\n") # TODO: split on lines that are too long...
         # draw label
-        FFI::NCurses.move(rect[:y] + i, rect[:x])
-        Colors.with(color) do
-          FFI::NCurses.addch(char.ord)
+        if in_rect(rect[:y] + i - @offset, rect[:x])
+          FFI::NCurses.move(rect[:y] + i - @offset, rect[:x])
+          Colors.with(color) do
+            FFI::NCurses.addch(char.ord)
+          end
         end
         lines.each_with_index do |l,j|
-          FFI::NCurses.move(rect[:y] + i + j, rect[:x] + 2)
+          next unless in_rect(rect[:y] + i + j - @offset, rect[:x] + 2)
+          FFI::NCurses.move(rect[:y] + i + j - @offset, rect[:x] + 2)
           Colors.with(color) do
             FFI::NCurses.addch('|'.ord)
           end
-          FFI::NCurses.move(rect[:y] + i + j, rect[:x] + 4)
+          FFI::NCurses.move(rect[:y] + i + j - @offset, rect[:x] + 4)
           FFI::NCurses.addstr(l)
         end
         i += lines.count + 1
       end
+    end
+
+    def in_rect(y,x)
+      w, h = @main_view.rect[:w], @main_view.rect[:h]
+      ox, oy = @main_view.rect[:x], @main_view.rect[:y]
+      x <= w + ox && x > ox && y <= h + oy && y > oy
     end
 
     def size(w,h)
@@ -123,10 +134,24 @@ module Azurill
       when 'c'.ord
         @main_view.dirty!
         @logs = []
+      when 'd'.ord
+        page_down
+      when 'u'.ord
+        page_up
       else
         @main_view.dirty!
         @logs << {m: 'Hello!', l: :verbose}
       end
+    end
+
+    def page_down
+      @offset += 5
+      @main_view.dirty!
+    end
+
+    def page_up
+      @offset -= 5
+      @main_view.dirty!
     end
 
     def draw
