@@ -19,4 +19,5 @@ Gem::Specification.new do |gem|
 
   gem.add_runtime_dependency 'ffi-ncurses'
   gem.add_runtime_dependency 'zmq'
+  gem.add_runtime_dependency 'json'
 end

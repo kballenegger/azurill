@@ -1,5 +1,9 @@
 
+require 'zmq'
+require 'json'
+
 require 'azurill/colors'
+require 'azurill/log'
 require 'azurill/view'
 
 module Azurill
@@ -24,12 +28,25 @@ module Azurill
       end
 
       @fetcher_thread = Thread.new do
-        while true
-          sleep(1)
-          @main_view.dirty!
-          str = "Hello world random #{rand(50)}..."
-          rand(5).times { str << "\nline!"}
-          @logs << {m: str, l: [:warn, :info, :err, :verbose].sample}
+        begin
+          ctx = ZMQ::Context.new
+          socket = ctx.socket(ZMQ::PULL)
+          socket.bind('tcp://0.0.0.0:7113')
+          Logger.log('Starting ZMQ socket...')
+          while (m = socket.recv(ZMQ::NOBLOCK)) || true
+            unless m
+              sleep(0.1)
+              next
+            end
+            payload = JSON.parse(m)
+            level = payload['l'].to_sym
+            @main_view.dirty!
+            @logs << {m: payload['m'], l: level}
+          end
+        ensure
+          Logger.log('Closing ZMQ.')
+          socket.close
+          ctx.close
         end
       end
 
@@ -46,6 +63,15 @@ module Azurill
     end
 
     def draw_status_bar
+      rect = @main_view.rect
+      FFI::NCurses.move(rect[:h] + 1, rect[:x])
+      top_bar_left = ' ***'
+      top_bar_right = '*** '
+      top_bar_middle = (rect[:w] - top_bar_left.length - top_bar_right.length).times.map {|_| ' ' }.join('')
+      top_bar = top_bar_left + top_bar_middle + top_bar_right
+      FFI::NCurses.attr_set(FFI::NCurses::A_BOLD, Colors.black_on_magenta, nil)
+      FFI::NCurses.addstr(top_bar)
+      Colors.reset!
     end
 
     def draw_content
@@ -56,13 +82,13 @@ module Azurill
                 when :verbose; :nocolor
                 when :info; :cyan_on_black
                 when :warn; :yellow_on_black
-                when :err; :red_on_black
+                when :error; :red_on_black
                 end
         char = case e[:l]
                when :verbose; 'V'
                when :info; 'I'
                when :warn; 'W'
-               when :err; 'E'
+               when :error; 'E'
                end
 
         lines = e[:m].split("\n") # TODO: split on lines that are too long...
