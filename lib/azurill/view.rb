@@ -4,8 +4,8 @@ module Azurill
   class View
 
     attr_accessor :rect
-    def initialize(rect)
-      @rect = rect
+    def initialize
+      @rect = {x: 0, y: 0, w: 0, h: 0}
       @dirty = true
       @subviews = []
     end

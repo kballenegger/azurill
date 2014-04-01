@@ -73,6 +73,7 @@ module Azurill
     def close!
       @controller.close! if @controller
       FFI::NCurses.endwin
+      Process.exit!
     end
 
     # This method gets executed for every iteration of the run loop.
@@ -87,6 +88,8 @@ module Azurill
           sleep(0.1)
         end
       end
+      h, w = FFI::NCurses.getmaxyx(FFI::NCurses.stdscr)
+      @controller.size(w,h)
       @controller.draw
     end
 

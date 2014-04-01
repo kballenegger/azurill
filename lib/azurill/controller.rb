@@ -13,7 +13,8 @@ module Azurill
     def initialize
       h, w = FFI::NCurses.getmaxyx(FFI::NCurses.stdscr)
 
-      @main_view = View.new({x: 0, y: 0, w: w, h: h - 2})
+      @main_view = View.new()
+      size(w, h)
 
       @logs = []
 
@@ -45,7 +46,6 @@ module Azurill
           end
         ensure
           Logger.log('Closing ZMQ.')
-          socket.close
           ctx.close
         end
       end
@@ -107,6 +107,10 @@ module Azurill
         end
         i += lines.count + 1
       end
+    end
+
+    def size(w,h)
+      @main_view.rect = {x: 0, y: 0, w: w, h: h - 2}
     end
 
     def handle_char(c)
