@@ -9,7 +9,7 @@ module Azurill
     def initialize
       h, w = FFI::NCurses.getmaxyx(FFI::NCurses.stdscr)
 
-      @main_view = View.new({x: 0, y: 1, w: w, h: h - 2})
+      @main_view = View.new({x: 0, y: 0, w: w, h: h - 1})
 
       @logs = []
 
@@ -18,9 +18,10 @@ module Azurill
         # first a line at the top
         FFI::NCurses.clear
         FFI::NCurses.move(rect[:y], rect[:x])
-        str = rect[:w].times.map {|_| '*' }.join('')
-        FFI::NCurses.attr_set(FFI::NCurses::A_UNDERLINE, Colors.yellow_on_black, nil)
-        FFI::NCurses.addstr(str)
+        top_bar = '[ session 1 ]'
+        top_bar << (rect[:w] - top_bar.length).times.map {|_| ' ' }.join('')
+        FFI::NCurses.attr_set(FFI::NCurses::A_BOLD, Colors.black_on_magenta, nil)
+        FFI::NCurses.addstr(top_bar)
         Colors.reset!
         # TODO: move to subview
         i = 1

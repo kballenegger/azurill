@@ -14,6 +14,7 @@ module Azurill
         define_color(:RED, :BLACK)
         define_color(:YELLOW, :BLACK)
         define_color(:CYAN, :BLACK)
+        define_color(:BLACK, :MAGENTA)
       end
 
 
@@ -49,7 +50,6 @@ module Azurill
       def define_color(foreground, background)
         f = FFI::NCurses::Color.const_get(foreground)
         b = FFI::NCurses::Color.const_get(background)
-        Logger.log("blah #{f} #{b}")
         FFI::NCurses.init_pair(@colors.count + 1, f, b)
         @colors << "#{foreground}_on_#{background}".downcase.to_sym
       end
