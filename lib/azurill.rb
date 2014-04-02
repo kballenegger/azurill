@@ -62,7 +62,9 @@ module Azurill
           FFI::NCurses.refresh
         end
       end
-    rescue
+    rescue Exception => e
+      Logger.log(e.message)
+      Logger.log(e.backtrace.join("\n"))
       FFI::NCurses.clear
       FFI::NCurses.endwin
       raise

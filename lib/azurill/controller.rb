@@ -17,6 +17,7 @@ module Azurill
       size(w, h)
 
       @logs = []
+      @processed_logs = []
 
       @offset = 0
 
@@ -44,7 +45,7 @@ module Azurill
             payload = JSON.parse(m)
             level = payload['l'].to_sym
             @main_view.dirty!
-            @logs << {m: payload['m'], l: level}
+            log({m: payload['m'], l: level})
           end
         ensure
           Logger.log('Closing ZMQ.')
@@ -79,24 +80,10 @@ module Azurill
     def draw_content
       rect = @main_view.rect
       i = 0
-      max_len = rect[:w] - 4
-      @logs.each do |e|
-        color = case e[:l]
-                when :verbose; :nocolor
-                when :info; :cyan_on_black
-                when :warn; :yellow_on_black
-                when :error; :red_on_black
-                end
-        char = case e[:l]
-               when :verbose; 'V'
-               when :info; 'I'
-               when :warn; 'W'
-               when :error; 'E'
-               end
-
-        lines = e[:m].split("\n").map do |l|
-          l.scan(/.{1,#{max_len}}/)
-        end.flatten
+      @processed_logs.each do |e|
+        char = e[:char]
+        color = e[:color]
+        lines = e[:lines]
         # draw label
         point = point_in_parent(rect[:y] + i - @offset, rect[:x])
         if in_rect(*point)
@@ -116,6 +103,41 @@ module Azurill
           FFI::NCurses.addstr(l)
         end
         i += lines.count + 1
+      end
+    end
+
+    def log(payload)
+      @logs << payload
+      process_logs
+    end
+
+    def process_logs
+      rect = @main_view.rect
+      max_len = rect[:w] - 4
+      @processed_logs = @logs.map do |e|
+        color = case e[:l]
+                when :verbose; :nocolor
+                when :info; :cyan_on_black
+                when :warn; :yellow_on_black
+                when :error; :red_on_black
+                end
+        char = case e[:l]
+               when :verbose; 'V'
+               when :info; 'I'
+               when :warn; 'W'
+               when :error; 'E'
+               end
+
+        lines = e[:m].split("\n").map do |l|
+          l.scan(/.{1,#{max_len}}/)
+        end.flatten
+
+        {
+          color: color,
+          char: char,
+          lines: lines,
+          line_count: lines.count,
+        }
       end
     end
 
@@ -148,13 +170,14 @@ module Azurill
       when 'c'.ord
         @main_view.dirty!
         @logs = []
+        process_logs
       when 'd'.ord
         page_down
       when 'u'.ord
         page_up
       else
         @main_view.dirty!
-        @logs << {m: 'Hello!', l: :verbose}
+        log({m: 'Hello!', l: :verbose})
       end
     end
 
