@@ -110,43 +110,47 @@ module Azurill
 
     def log(payload)
       @logs << payload
-      process_logs
+      @processed_logs << processed_log(payload)
       bottom if @tailing
     end
 
     def process_logs
+      @processed_logs = @logs.map do |e|
+        processed_log(e)
+      end
+    end
+
+    def processed_log(e)
       rect = @main_view.rect
       max_len = rect[:w] - 4
-      @processed_logs = @logs.map do |e|
-        color = case e[:l]
-                when :verbose; :nocolor
-                when :info; :cyan_on_black
-                when :warn; :yellow_on_black
-                when :error; :red_on_black
-                end
-        char = case e[:l]
-               when :verbose; 'V'
-               when :info; 'I'
-               when :warn; 'W'
-               when :error; 'E'
-               end
+      color = case e[:l]
+              when :verbose; :nocolor
+              when :info; :cyan_on_black
+              when :warn; :yellow_on_black
+              when :error; :red_on_black
+              end
+      char = case e[:l]
+             when :verbose; 'V'
+             when :info; 'I'
+             when :warn; 'W'
+             when :error; 'E'
+             end
 
-        lines = e[:m].split("\n").map do |l|
-          l.scan(/.{1,#{max_len}}/)
-        end.flatten
-        unless @expand
-          old_lines_count = lines.length
-          lines = lines.first(3)
-          lines << '...' if lines.length < old_lines_count
-        end
-
-        {
-          color: color,
-          char: char,
-          lines: lines,
-          line_count: lines.length,
-        }
+      lines = e[:m].split("\n").map do |l|
+        l.scan(/.{1,#{max_len}}/)
+      end.flatten
+      unless @expand
+        old_lines_count = lines.length
+        lines = lines.first(3)
+        lines << '...' if lines.length < old_lines_count
       end
+
+      {
+        color: color,
+        char: char,
+        lines: lines,
+        line_count: lines.length,
+      }
     end
 
     # y, x
