@@ -20,6 +20,8 @@ module Azurill
       @processed_logs = []
 
       @offset = 0
+      @expand = true
+      @tailing = true
 
       controller = self
       @main_view.draw do
@@ -109,6 +111,7 @@ module Azurill
     def log(payload)
       @logs << payload
       process_logs
+      bottom if @tailing
     end
 
     def process_logs
@@ -131,6 +134,11 @@ module Azurill
         lines = e[:m].split("\n").map do |l|
           l.scan(/.{1,#{max_len}}/)
         end.flatten
+        unless @expand
+          old_lines_count = lines.length
+          lines = lines.first(3)
+          lines << '...' if lines.length < old_lines_count
+        end
 
         {
           color: color,
@@ -175,10 +183,18 @@ module Azurill
         page_down
       when 'u'.ord
         page_up
+      when 'T'.ord
+        tailing(false)
+      when 't'.ord
+        tailing(true)
+        bottom
       when 'E'.ord
-        expand(true)
+        expand(false)
       when 'e'.ord
         expand(true)
+      when 'g'.ord
+        @offset = 0
+        @main_view.dirty!
       when 'G'.ord
         bottom
       else
@@ -205,6 +221,13 @@ module Azurill
     end
 
     def expand(bool)
+      @expand = bool
+      process_logs
+      @main_view.dirty!
+    end
+
+    def tailing(bool)
+      @tailing = bool
     end
 
     def draw
