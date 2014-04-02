@@ -136,7 +136,7 @@ module Azurill
           color: color,
           char: char,
           lines: lines,
-          line_count: lines.count,
+          line_count: lines.length,
         }
       end
     end
@@ -175,6 +175,12 @@ module Azurill
         page_down
       when 'u'.ord
         page_up
+      when 'E'.ord
+        expand(true)
+      when 'e'.ord
+        expand(true)
+      when 'G'.ord
+        bottom
       else
         @main_view.dirty!
         log({m: 'Hello!', l: :verbose})
@@ -189,6 +195,16 @@ module Azurill
     def page_up
       @offset -= 5
       @main_view.dirty!
+    end
+
+    def bottom
+      total_lines = @processed_logs.length + (@processed_logs.map {|l|l[:line_count]}.reduce(&:+) || 0)
+      @offset = total_lines - @main_view.rect[:h]
+      @offset = 0 if total_lines < @main_view.rect[:h]
+      @main_view.dirty!
+    end
+
+    def expand(bool)
     end
 
     def draw
