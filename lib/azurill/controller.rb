@@ -16,13 +16,6 @@ module Azurill
       @main_view = View.new()
       size(w, h)
 
-      @logs = []
-      @processed_logs = []
-
-      @offset = 0
-      @expand = true
-      @tailing = true
-
       controller = self
       @main_view.draw do
         # first a line at the top
@@ -33,6 +26,11 @@ module Azurill
         controller.draw_content
       end
 
+      start_zmq_reader
+      initialize_values
+    end
+
+    def start_zmq_reader
       @fetcher_thread = Thread.new do
         begin
           ctx = ZMQ::Context.new
@@ -54,7 +52,16 @@ module Azurill
           ctx.close
         end
       end
+    end
 
+    def initialize_values
+      @logs = []
+      @processed_logs = []
+
+      @offset = 0
+      @expand = true
+      @tailing = true
+      @anchor = :bottom
     end
 
     def draw_tab_bar(t)
@@ -111,7 +118,11 @@ module Azurill
     def log(payload)
       @logs << payload
       @processed_logs << processed_log(payload)
-      bottom if @tailing
+      if @tailing
+        bottom
+      else
+        snap_to_anchor
+      end
     end
 
     def process_logs
@@ -172,6 +183,42 @@ module Azurill
       @main_view.rect = {x: 0, y: 1, w: w, h: h - 2}
     end
 
+    def snap_to_anchor
+      case @anchor
+      when :bottom
+        bottom
+      when :top
+        top
+      when Hash
+        # for now, a Hash means that it's a log item, with the following
+        # format: 
+        #   {
+        #     offset: Numeric # where on screen that offset starts
+        #     log: Numeric # the index of the log to anchor
+        #   }
+        index, offset = @anchor[:log], @anchor[:offset]
+        before = @processed_logs.first(index)
+        @offset = before.map {|e| e[:line_count] + 1 }.reduce(&:+) || 0
+        @offset += offset
+        @main_view.dirty!
+      end
+    end
+
+    def anchor_to_top_log
+      @tailing = false
+      heights = @processed_logs.map {|e| e[:line_count] + 1 }
+      # find the first that's on screen right now
+      i, sum = 0, 0
+      i, sum = i+1, sum + heights[i] while sum < @offset && heights[i]
+      return if i > heights.length # FIXME
+      @anchor = {
+        log: i,
+        offset: @offset - sum - heights[i-1] + 2,
+        # i have no idea why we need to +2 here. fuck.
+      }
+      Logger.log("anchor #{@anchor}")
+    end
+
     def handle_char(c)
       case c
       when 'q'.ord
@@ -180,9 +227,8 @@ module Azurill
           Application.exit!
         end
       when 'c'.ord
+        initialize_values
         @main_view.dirty!
-        @logs = []
-        process_logs
       when 'd'.ord
         page_down
       when 'u'.ord
@@ -198,9 +244,11 @@ module Azurill
         expand(true)
       when 'g'.ord
         @offset = 0
+        @anchor = :top
         @main_view.dirty!
       when 'G'.ord
         bottom
+        @anchor = :bottom
       else
         @main_view.dirty!
         log({m: 'Hello!', l: :verbose})
@@ -208,12 +256,16 @@ module Azurill
     end
 
     def page_down
-      @offset += 5
+      @offset = [@offset - 5, 0].max
+      anchor_to_top_log
       @main_view.dirty!
     end
 
     def page_up
-      @offset -= 5
+      total_lines = @processed_logs.map {|e| e[:line_count] + 1 }.reduce(&:+)
+      min_offset = total_lines - @main_view.rect[:h]
+      @offset =  total_lines < @main_view.rect[:h] ? 0 : [@offset + 5, min_offset].min
+      anchor_to_top_log
       @main_view.dirty!
     end
 
@@ -227,6 +279,7 @@ module Azurill
     def expand(bool)
       @expand = bool
       process_logs
+      snap_to_anchor
       @main_view.dirty!
     end
 
