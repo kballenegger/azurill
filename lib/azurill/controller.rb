@@ -216,7 +216,7 @@ module Azurill
         offset: @offset - sum - heights[i-1] + 2,
         # i have no idea why we need to +2 here. fuck.
       }
-      Logger.log("anchor #{@anchor}")
+      Logger.log("Anchoring to #{@anchor}")
     end
 
     def handle_char(c)
