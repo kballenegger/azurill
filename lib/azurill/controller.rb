@@ -59,6 +59,7 @@ module Azurill
       @logs = []
       @processed_logs = []
 
+      @selected = nil
       @offset = 0
       @expand = true
       @tailing = true
@@ -70,9 +71,9 @@ module Azurill
       FFI::NCurses.move(rect[:y]-1, rect[:x])
       top_bar = t
       top_bar << (rect[:w] + 1 - top_bar.length).times.map {|_| ' ' }.join('')
-      FFI::NCurses.attr_set(FFI::NCurses::A_BOLD, Colors.black_on_magenta, nil)
-      FFI::NCurses.addstr(top_bar)
-      Colors.reset!
+      Colors.with(:white_on_800040) do
+        FFI::NCurses.addstr(top_bar)
+      end
     end
 
     def draw_status_bar
@@ -82,16 +83,17 @@ module Azurill
       top_bar_right = '*** '
       top_bar_middle = (rect[:w] + 1 - top_bar_left.length - top_bar_right.length).times.map {|_| ' ' }.join('')
       top_bar = top_bar_left + top_bar_middle + top_bar_right
-      FFI::NCurses.attr_set(FFI::NCurses::A_BOLD, Colors.black_on_magenta, nil)
-      FFI::NCurses.addstr(top_bar)
-      Colors.reset!
+      Colors.with(:white_on_800040) do
+        FFI::NCurses.addstr(top_bar)
+      end
     end
 
     def draw_scrollbar
       rect = @main_view.rect
       0.upto(rect[:h]-1) do |i|
         FFI::NCurses.move(rect[:y] + i, rect[:x] + rect[:w])
-        Colors.with(:black_on_466622) do
+        pair = i < 5 ? :black_on_636363 : :black_on_3f3f3f
+        Colors.with(pair) do
           FFI::NCurses.addch(' '.ord)
         end
       end
@@ -100,27 +102,40 @@ module Azurill
     def draw_content
       rect = @main_view.rect
       i = 0
-      @processed_logs.each do |e|
+      @processed_logs.each_with_index do |e, index|
         char = e[:char]
         color = e[:color]
         lines = e[:lines]
+        bg = @selected.is_a?(Integer) && index == @selected ? '1a1a1a' : 'black'
+        pair = "#{color}_on_#{bg}".to_sym
         # draw label
+        lines.each_with_index do |l,j|
+          point = point_in_parent(rect[:y] + i + j - @offset, rect[:x])
+          next unless in_rect(*point)
+          # draw background
+          FFI::NCurses.move(*point)
+          Colors.with("white_on_#{bg}".to_sym) do
+            bgstr = rect[:w].times.map {|_| ' ' }.join
+            FFI::NCurses.addstr(bgstr)
+          end
+          # draw line
+          point = point_in_parent(rect[:y] + i + j - @offset, rect[:x] + 2)
+          FFI::NCurses.move(*point)
+          Colors.with(pair) do
+            FFI::NCurses.addch('|'.ord)
+          end
+          # draw text
+          FFI::NCurses.move(*point_in_parent(rect[:y] + i + j - @offset, rect[:x] + 4))
+          Colors.with("white_on_#{bg}".to_sym) do
+            FFI::NCurses.addstr(l)
+          end
+        end
         point = point_in_parent(rect[:y] + i - @offset, rect[:x])
         if in_rect(*point)
           FFI::NCurses.move(*point)
-          Colors.with(color) do
+          Colors.with(pair) do
             FFI::NCurses.addch(char.ord)
           end
-        end
-        lines.each_with_index do |l,j|
-          point = point_in_parent(rect[:y] + i + j - @offset, rect[:x] + 2)
-          next unless in_rect(*point)
-          FFI::NCurses.move(*point)
-          Colors.with(color) do
-            FFI::NCurses.addch('|'.ord)
-          end
-          FFI::NCurses.move(*point_in_parent(rect[:y] + i + j - @offset, rect[:x] + 4))
-          FFI::NCurses.addstr(l)
         end
         i += lines.count + 1
       end
@@ -146,10 +161,10 @@ module Azurill
       rect = @main_view.rect
       max_len = rect[:w] - 4
       color = case e[:l]
-              when :verbose; :nocolor
-              when :info; :cyan_on_black
-              when :warn; :yellow_on_black
-              when :error; :red_on_black
+              when :verbose; :dddddd
+              when :info; :cyan
+              when :warn; :yellow
+              when :error; :red
               end
       char = case e[:l]
              when :verbose; 'V'
@@ -199,7 +214,8 @@ module Azurill
       when :bottom
         bottom
       when :top
-        top
+        @offset = 0
+        @main_view.dirty!
       when Hash
         # for now, a Hash means that it's a log item, with the following
         # format: 
@@ -260,6 +276,9 @@ module Azurill
       when 'G'.ord
         bottom
         @anchor = :bottom
+      when 27 # ESC
+        @selected = nil
+        @main_view.dirty!
       else
         @main_view.dirty!
         log({m: 'Hello!', l: :verbose})
