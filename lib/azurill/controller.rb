@@ -318,18 +318,15 @@ module Azurill
       when 'G'.ord
         bottom
         @anchor = :bottom
-      when 'n'.ord
+      when 'n'.ord, 'j'.ord
         select_next
-      when 'p'.ord
+      when 'p'.ord, 'k'.ord
         select_previous
       when 27 # ESC
         @selected = nil
         @main_view.dirty!
       when 10 # CR
         handle_enter
-      else
-        @main_view.dirty!
-        log({m: 'Hello!', l: :verbose})
       end
     end
 
