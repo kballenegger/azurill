@@ -23,6 +23,7 @@ module Azurill
         controller.draw_tab_bar('[ session 1 ]')
         controller.draw_status_bar
         # TODO: move to subview
+        controller.draw_scrollbar
         controller.draw_content
       end
 
@@ -68,7 +69,7 @@ module Azurill
       rect = @main_view.rect
       FFI::NCurses.move(rect[:y]-1, rect[:x])
       top_bar = t
-      top_bar << (rect[:w] - top_bar.length).times.map {|_| ' ' }.join('')
+      top_bar << (rect[:w] + 1 - top_bar.length).times.map {|_| ' ' }.join('')
       FFI::NCurses.attr_set(FFI::NCurses::A_BOLD, Colors.black_on_magenta, nil)
       FFI::NCurses.addstr(top_bar)
       Colors.reset!
@@ -79,11 +80,21 @@ module Azurill
       FFI::NCurses.move(rect[:h] + 1, rect[:x])
       top_bar_left = ' ***'
       top_bar_right = '*** '
-      top_bar_middle = (rect[:w] - top_bar_left.length - top_bar_right.length).times.map {|_| ' ' }.join('')
+      top_bar_middle = (rect[:w] + 1 - top_bar_left.length - top_bar_right.length).times.map {|_| ' ' }.join('')
       top_bar = top_bar_left + top_bar_middle + top_bar_right
       FFI::NCurses.attr_set(FFI::NCurses::A_BOLD, Colors.black_on_magenta, nil)
       FFI::NCurses.addstr(top_bar)
       Colors.reset!
+    end
+
+    def draw_scrollbar
+      rect = @main_view.rect
+      0.upto(rect[:h]-1) do |i|
+        FFI::NCurses.move(rect[:y] + i, rect[:x] + rect[:w])
+        Colors.with(:black_on_466622) do
+          FFI::NCurses.addch(' '.ord)
+        end
+      end
     end
 
     def draw_content
@@ -180,7 +191,7 @@ module Azurill
     end
 
     def size(w,h)
-      @main_view.rect = {x: 0, y: 1, w: w, h: h - 2}
+      @main_view.rect = {x: 0, y: 1, w: w - 1, h: h - 2}
     end
 
     def snap_to_anchor
