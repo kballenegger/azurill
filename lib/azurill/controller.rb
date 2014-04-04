@@ -57,11 +57,12 @@ module Azurill
 
     def initialize_values
       @logs = []
+      @transforms = []
       @processed_logs = []
 
       @selected = nil
       @offset = 0
-      @expand = true
+      @expand = false
       @tailing = true
       @anchor = :bottom
     end
@@ -143,7 +144,8 @@ module Azurill
 
     def log(payload)
       @logs << payload
-      @processed_logs << processed_log(payload)
+      @transforms << {expand: @expand}
+      @processed_logs << processed_log(payload, @transforms.last)
       if @tailing
         bottom
       else
@@ -152,12 +154,14 @@ module Azurill
     end
 
     def process_logs
-      @processed_logs = @logs.map do |e|
-        processed_log(e)
+      @processed_logs = @logs.each_with_index.map do |e,i|
+        processed_log(e, @transforms[i])
       end
     end
 
-    def processed_log(e)
+    def processed_log(e, transform = {})
+      # opt param
+      expand = transform[:expand]
       rect = @main_view.rect
       max_len = rect[:w] - 4
       color = case e[:l]
@@ -176,7 +180,7 @@ module Azurill
       lines = e[:m].split("\n").map do |l|
         l.scan(/.{1,#{max_len}}/)
       end.flatten
-      unless @expand
+      unless expand
         old_lines_count = lines.length
         lines = lines.first(3)
         lines << '...' if lines.length < old_lines_count
@@ -231,18 +235,45 @@ module Azurill
       end
     end
 
-    def anchor_to_top_log
-      @tailing = false
+    def anchor_of_top_visible_log
       heights = @processed_logs.map {|e| e[:line_count] + 1 }
       # find the first that's on screen right now
       i, sum = 0, 0
       i, sum = i+1, sum + heights[i] while sum < @offset && heights[i]
-      return if i > heights.length # FIXME
-      @anchor = {
-        log: i,
+      return {log: 0, offset: 0} if i > heights.length || i < 1 # FIXME
+      {
+        log: i-1,
         offset: @offset - sum - heights[i-1] + 2,
         # i have no idea why we need to +2 here. fuck.
       }
+    end
+
+    def anchor_of_bottom_visible_log
+      heights = @processed_logs.map {|e| e[:line_count] + 1 }
+      # find the first that's on screen right now
+      i, sum = 0, 0
+      i, sum = i+1, sum + heights[i] while sum < @offset + @main_view.rect[:h] && heights[i]
+      i -= 1
+      return {log: 0, offset: 0} if i > heights.length || i < 1 # FIXME
+      {
+        log: i-1,
+        offset: @offset - sum - heights[i-1] + 2,
+        # i have no idea why we need to +2 here. fuck.
+      }
+    end
+
+    def anchor_to_index(i)
+      height_above = @processed_logs.first(i).map {|e| e[:line_count] + 1 }.reduce(&:+)
+      @anchor = {
+        log: i,
+        offset: @offset - height_above,
+      }
+      Logger.log("Anchoring to #{@anchor}")
+    end
+
+    def anchor_to_top_log
+      @tailing = false
+      @anchor = anchor_of_top_visible_log
       Logger.log("Anchoring to #{@anchor}")
     end
 
@@ -276,13 +307,51 @@ module Azurill
       when 'G'.ord
         bottom
         @anchor = :bottom
+      when 'n'.ord
+        select_next
+      when 'p'.ord
+        select_previous
       when 27 # ESC
         @selected = nil
         @main_view.dirty!
+      when 10 # CR
+        handle_enter
       else
         @main_view.dirty!
         log({m: 'Hello!', l: :verbose})
       end
+    end
+
+    def handle_enter
+      return unless @selected.is_a?(Numeric) && @processed_logs[@selected]
+      transform = @transforms[@selected]
+      transform[:expand] = !transform[:expand]
+      @transforms[@selected] = transform
+      new_log = processed_log(@logs[@selected], transform)
+      @processed_logs[@selected] = new_log
+      @main_view.dirty!
+    end
+
+    def select_next
+      return if @selected.is_a?(Numeric) && @selected >= @processed_logs.length - 1
+      if nil == @selected
+        @selected = anchor_of_top_visible_log[:log]
+      else
+        @selected += 1
+      end
+      process_logs
+      @main_view.dirty!
+    end
+
+    def select_previous
+      return if @selected.is_a?(Numeric) && @selected <= 0
+      if nil == @selected
+        @selected = anchor_of_bottom_visible_log[:log]
+      else
+        @selected -= 1
+      end
+      process_logs
+      @main_view.dirty!
     end
 
     def page_down
@@ -308,6 +377,7 @@ module Azurill
 
     def expand(bool)
       @expand = bool
+      @transforms.map! {|e| e[:expand] = bool; e }
       process_logs
       snap_to_anchor
       @main_view.dirty!
