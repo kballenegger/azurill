@@ -46,7 +46,14 @@ module Azurill
             payload = JSON.parse(m)
             level = payload['l'].to_sym
             @main_view.dirty!
-            log({m: payload['m'], l: level})
+            log_p = {
+              m: payload['m'],
+              l: level,
+            }
+            [:sfn, :sf, :sl].each do |k|
+              log_p[k] = payload[k.to_s]
+            end
+            log(log_p)
           end
         ensure
           Logger.log('Closing ZMQ.')
@@ -110,7 +117,7 @@ module Azurill
         bg = @selected.is_a?(Integer) && index == @selected ? '1a1a1a' : 'black'
         pair = "#{color}_on_#{bg}".to_sym
         # draw label
-        lines.each_with_index do |l,j|
+        ([e[:info]] + lines).each_with_index do |l,j|
           point = point_in_parent(rect[:y] + i + j - @offset, rect[:x])
           next unless in_rect(*point)
           # draw background
@@ -127,7 +134,8 @@ module Azurill
           end
           # draw text
           FFI::NCurses.move(*point_in_parent(rect[:y] + i + j - @offset, rect[:x] + 4))
-          Colors.with("white_on_#{bg}".to_sym) do
+          textcolor = j == 0 ? "ff66ff_on_#{bg}" : "white_on_#{bg}"
+          Colors.with(textcolor.to_sym) do
             FFI::NCurses.addstr(l)
           end
         end
@@ -138,7 +146,7 @@ module Azurill
             FFI::NCurses.addch(char.ord)
           end
         end
-        i += lines.count + 1
+        i += e[:line_count] + 1
       end
     end
 
@@ -186,11 +194,14 @@ module Azurill
         lines << '...' if lines.length < old_lines_count
       end
 
+      infoline = "#{e[:sf]} | #{e[:sl]} | #{e[:sfn]}".scan(/.{1,#{max_len}}/).first
+
       {
         color: color,
         char: char,
         lines: lines,
-        line_count: lines.length,
+        info: infoline,
+        line_count: lines.length + 1,
       }
     end
 
