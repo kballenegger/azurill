@@ -412,31 +412,51 @@ module Azurill
       transform = @transforms[@selected]
       transform[:expand] = !transform[:expand]
       @transforms[@selected] = transform
-      new_log = processed_log(@logs[@selected], transform)
-      @processed_logs[@selected] = new_log
+      reprocess_log(@selected)
+    end
+
+    def reprocess_log(i)
+      new_log = processed_log(@logs[i], @transforms[i])
+      @processed_logs[i] = new_log
       @main_view.dirty!
     end
 
     def select_next
-      return if @selected.is_a?(Numeric) && @selected >= @processed_logs.length - 1
-      if nil == @selected
-        @selected = anchor_of_top_visible_log[:log]
+      s = @selected
+      return if s.is_a?(Numeric) && s >= @processed_logs.length - 1
+      if nil == s
+        s = anchor_of_top_visible_log[:log]
       else
-        @selected += 1
+        s += 1
+        until @processed_logs[s][:show]
+          if s >= @processed_logs.length - 1
+            s = @selected; break
+          end
+          s += 1
+        end
       end
-      process_logs
-      @main_view.dirty!
+      reprocess_log(@selected) if @selected
+      reprocess_log(s) if s && s != @selected
+      @selected = s
     end
 
     def select_previous
-      return if @selected.is_a?(Numeric) && @selected <= 0
-      if nil == @selected
-        @selected = anchor_of_bottom_visible_log[:log]
+      s = @selected
+      return if s.is_a?(Numeric) && s <= 0
+      if nil == s
+        s = anchor_of_bottom_visible_log[:log]
       else
-        @selected -= 1
+        s -= 1
+        until @processed_logs[s][:show]
+          if s <= 0
+            s = @selected; break
+          end
+          s -= 1
+        end
       end
-      process_logs
-      @main_view.dirty!
+      reprocess_log(@selected) if @selected
+      reprocess_log(s) if s && s != @selected
+      @selected = s
     end
 
     def page_down
