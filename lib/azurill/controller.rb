@@ -98,9 +98,15 @@ module Azurill
 
     def draw_scrollbar
       rect = @main_view.rect
+      total_lines = @processed_logs.map {|e| e[:line_count] + 1 }.reduce(&:+) || 0
+      top = (rect[:h].to_f / total_lines * @offset)
+      top = 0 if top.nan? || top.infinite?
+      bottom = (rect[:h].to_f / total_lines * (@offset + rect[:h]))
+      bottom = rect[:h] if bottom.nan? || bottom.infinite?
+      top, bottom = [0, top.round].max, [bottom.round, rect[:h]].min
       0.upto(rect[:h]-1) do |i|
         FFI::NCurses.move(rect[:y] + i, rect[:x] + rect[:w])
-        pair = i < 5 ? :black_on_636363 : :black_on_3f3f3f
+        pair = i >= top && i < bottom ? :black_on_636363 : :black_on_3f3f3f
         Colors.with(pair) do
           FFI::NCurses.addch(' '.ord)
         end
