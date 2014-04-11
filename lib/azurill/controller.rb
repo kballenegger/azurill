@@ -56,6 +56,9 @@ module Azurill
             end
             log(log_p)
           end
+        rescue Exception => e
+          Logger.log(e.message)
+          Logger.log(e.backtrace.join("\n"))
         ensure
           Logger.log('Closing ZMQ.')
           ctx.close
@@ -68,6 +71,7 @@ module Azurill
       @transforms = []
       @processed_logs = []
 
+      @filter = nil
       @selected = nil
       @offset = 0
       @expand = false
@@ -118,6 +122,7 @@ module Azurill
       rect = @main_view.rect
       i = 0
       @processed_logs.each_with_index do |e, index|
+        next unless e[:show]
         char = e[:char]
         color = e[:color]
         lines = e[:lines]
@@ -125,6 +130,7 @@ module Azurill
         pair = "#{color}_on_#{bg}".to_sym
         # draw label
         ([e[:info]] + lines).each_with_index do |l,j|
+          l, hl = l[:t], l[:hl]
           point = point_in_parent(rect[:y] + i + j - @offset, rect[:x])
           next unless in_rect(*point)
           # draw background
@@ -144,6 +150,15 @@ module Azurill
           textcolor = j == 0 ? "ff66ff_on_#{bg}" : "white_on_#{bg}"
           Colors.with(textcolor.to_sym) do
             FFI::NCurses.addstr(l)
+          end
+          # re-draw highlights
+          hl.each do |a,b|
+            str = l[a..b]
+            FFI::NCurses.move(*point_in_parent(rect[:y] + i + j - @offset,
+                                               rect[:x] + 4 + a))
+            Colors.with(:black_on_red) do
+              FFI::NCurses.addstr(str)
+            end
           end
         end
         point = point_in_parent(rect[:y] + i - @offset, rect[:x])
@@ -192,23 +207,59 @@ module Azurill
              when :error; 'E'
              end
 
+      infoline = "#{e[:sf]} | #{e[:sl]} | #{e[:sfn]}".scan(/.{1,#{max_len}}/).first
+
+      show = true
+      if @filter
+        matches_i = infoline.enum_for(:scan, @filter)\
+          .map { $~.offset(0) }.map {|a,b| [a, b-1] }
+        matches_m = e[:m].enum_for(:scan, @filter)\
+          .map { $~.offset(0) }.map {|a,b| [a, b-1] }
+        show = !matches_i.empty? || !matches_m.empty?
+      end
+      matches_i ||= []; matches_m ||= []
+
+      scanned_chars = 0
       lines = e[:m].split("\n").map do |l|
-        l.scan(/.{1,#{max_len}}/)
-      end.flatten
+        add = 1
+        l.scan(/.{1,#{max_len}}/).map do |line|
+          r = {l: line, a: add}
+          add = 0; r
+        end
+      end.flatten.map do |o, i|
+        txt, add = o[:l], o[:a]
+        hl = []
+        matches_m.each do |a,b|
+          next if b < scanned_chars
+          break if a > scanned_chars + txt.length
+          if b < scanned_chars + txt.length && a >= scanned_chars
+            hl << [a-scanned_chars, b-scanned_chars]; next
+          end
+          # if we got here; it means it's overlapping and needs to be split
+          if a < scanned_chars
+            a = scanned_chars
+          end
+          if b > scanned_chars + txt.length
+            b = scanned_chars + txt.length
+          end
+          hl << [a-scanned_chars, b-scanned_chars]; next
+        end
+        scanned_chars += txt.length + add # for split \n
+        {t: txt, hl: hl}
+      end
       unless expand
         old_lines_count = lines.length
         lines = lines.first(3)
-        lines << '...' if lines.length < old_lines_count
+        lines << {t: '...', hl: []} if lines.length < old_lines_count
       end
-
-      infoline = "#{e[:sf]} | #{e[:sl]} | #{e[:sfn]}".scan(/.{1,#{max_len}}/).first
 
       {
         color: color,
         char: char,
         lines: lines,
-        info: infoline,
-        line_count: lines.length + 1,
+        info: {t: infoline, hl: matches_i},
+        line_count: show ? lines.length + 1 : -1,
+        show: show,
       }
     end
 
@@ -342,12 +393,27 @@ module Azurill
 
     def search
       r = @main_view.rect; r[:y], r[:h], r[:w] = r[:h] + 1, 1, r[:w] + 1
-      opts = {prompt: '/'}
+      opts = {prompt: 'filter: '}
       @main_view.add_subview(@active_view = CommandBarWindow.new(r, opts) do |s|
         @main_view.remove_subview(@active_view); @active_view = nil
         @main_view.dirty!
-        Logger.log("command bar #{s}")
+        @filter = nil
+        if s
+          Logger.log("Searching: #{s}")
+          opts = s =~ /[A-Z]/ ? nil : Regexp::IGNORECASE
+          @filter = Regexp.new(s, opts)
+        end
+        process_logs
       end)
+    end
+
+    def filter(regex)
+      @filter = ->(e) do
+        return true if regex.match(e[:sf])
+        return true if regex.match(e[:sfn])
+        return true if regex.match(e[:m])
+        false
+      end
     end
 
     def handle_enter
