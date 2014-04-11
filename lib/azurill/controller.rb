@@ -5,6 +5,7 @@ require 'json'
 require 'azurill/colors'
 require 'azurill/log'
 require 'azurill/view'
+require 'azurill/command-bar-window'
 
 module Azurill
   
@@ -295,6 +296,7 @@ module Azurill
     end
 
     def handle_char(c)
+      return @active_view.handle_char(c) if @active_view
       case c
       when 'q'.ord
         Application.current.next do
@@ -328,12 +330,24 @@ module Azurill
         select_next
       when 'p'.ord, 'k'.ord
         select_previous
+      when '/'.ord
+        search
       when 27 # ESC
         @selected = nil
         @main_view.dirty!
       when 10 # CR
         handle_enter
       end
+    end
+
+    def search
+      r = @main_view.rect; r[:y], r[:h], r[:w] = r[:h] + 1, 1, r[:w] + 1
+      opts = {prompt: '/'}
+      @main_view.add_subview(@active_view = CommandBarWindow.new(r, opts) do |s|
+        @main_view.remove_subview(@active_view); @active_view = nil
+        @main_view.dirty!
+        Logger.log("command bar #{s}")
+      end)
     end
 
     def handle_enter

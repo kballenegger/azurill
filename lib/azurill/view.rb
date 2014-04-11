@@ -18,6 +18,10 @@ module Azurill
       @subviews << v
     end
 
+    def remove_subview(v)
+      @subviews.delete(v)
+    end
+
     def draw(&b)
       if block_given?
         @drawer = b
