@@ -398,22 +398,13 @@ module Azurill
         @main_view.remove_subview(@active_view); @active_view = nil
         @main_view.dirty!
         @filter = nil
-        if s
+        if s && s != ''
           Logger.log("Searching: #{s}")
           opts = s =~ /[A-Z]/ ? nil : Regexp::IGNORECASE
           @filter = Regexp.new(s, opts)
         end
         process_logs
       end)
-    end
-
-    def filter(regex)
-      @filter = ->(e) do
-        return true if regex.match(e[:sf])
-        return true if regex.match(e[:sfn])
-        return true if regex.match(e[:m])
-        false
-      end
     end
 
     def handle_enter
